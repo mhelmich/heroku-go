@@ -489,6 +489,48 @@
                   "$ref": "#/definitions/organization/definitions/name"
                 }
               }
+            },
+            "owner": {
+              "description": "entity that owns this identity provider",
+              "properties": {
+                "id": {
+                  "description": "unique identifier of the owner",
+                  "example": "01234567-89ab-cdef-0123-456789abcdef",
+                  "format": "uuid",
+                  "readOnly": true,
+                  "type": [
+                    "string"
+                  ]
+                },
+                "name": {
+                  "description": "name of the owner",
+                  "example": "acme",
+                  "readOnly": true,
+                  "type": [
+                    "string"
+                  ]
+                },
+                "type": {
+                  "description": "type of the owner",
+                  "enum": [
+                    "team",
+                    "enterprise-account"
+                  ],
+                  "example": "team",
+                  "readOnly": true,
+                  "type": [
+                    "string"
+                  ]
+                }
+              },
+              "readOnly": false,
+              "required": [
+                "id",
+                "type"
+              ],
+              "type": [
+                "object"
+              ]
             }
           },
           "type": [
@@ -5554,6 +5596,19 @@
             "string"
           ]
         },
+        "docker_image": {
+          "description": "the Docker image used by this process type",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/docker-image/definitions/id"
+            }
+          },
+          "strictProperties": true,
+          "type": [
+            "object",
+            "null"
+          ]
+        },
         "id": {
           "description": "unique identifier of this process type",
           "example": "01234567-89ab-cdef-0123-456789abcdef",
@@ -5593,7 +5648,6 @@
           "description": "type of process to maintain",
           "example": "web",
           "readOnly": true,
-          "pattern": "^[-\\w]{1,128}$",
           "type": [
             "string"
           ]
@@ -5611,19 +5665,25 @@
           "additionalProperties": false,
           "description": "Properties to update a process type",
           "properties": {
+            "docker_image": {
+              "$ref": "#/definitions/docker-image/definitions/identity"
+            },
+            "command": {
+              "$ref": "#/definitions/formation/definitions/command"
+            },
+            "process": {
+              "$ref": "#/definitions/formation/definitions/identity"
+            },
             "quantity": {
               "$ref": "#/definitions/formation/definitions/quantity"
             },
             "size": {
               "$ref": "#/definitions/formation/definitions/size"
-            },
-            "type": {
-              "$ref": "#/definitions/formation/definitions/type"
             }
           },
           "readOnly": false,
           "required": [
-            "type"
+            "process"
           ],
           "type": [
             "object"
@@ -5670,7 +5730,16 @@
                 "items": {
                   "$ref": "#/definitions/formation/definitions/update"
                 },
-                "description": "Array with formation updates. Each element must have \"type\", the id or name of the process type to be updated, and can optionally update its \"quantity\" or \"size\"."
+                "description": "Array with formation updates. Each element must have \"type\", the id or name of the process type to be updated, and can optionally update its \"quantity\" or \"size\".",
+                "example": [
+                  {
+                    "quantity": 1,
+                    "size": "standard-2X",
+                    "type": [
+                      "web"
+                    ]
+                  }
+                ]
               }
             },
             "required": [
@@ -5688,7 +5757,7 @@
               "array"
             ]
           },
-          "title": "Batch Update"
+          "title": "Batch update"
         },
         {
           "description": "Update process type",
@@ -5697,6 +5766,12 @@
           "rel": "update",
           "schema": {
             "properties": {
+              "command": {
+                "$ref": "#/definitions/formation/definitions/command"
+              },
+              "docker_image": {
+                "$ref": "#/definitions/docker-image/definitions/identity"
+              },
               "quantity": {
                 "$ref": "#/definitions/formation/definitions/quantity"
               },
@@ -5737,6 +5812,9 @@
         },
         "created_at": {
           "$ref": "#/definitions/formation/definitions/created_at"
+        },
+        "docker_image": {
+          "$ref": "#/definitions/formation/definitions/docker_image"
         },
         "id": {
           "$ref": "#/definitions/formation/definitions/id"
@@ -5822,6 +5900,48 @@
           "readOnly": true,
           "type": [
             "string"
+          ]
+        },
+        "owner": {
+          "description": "entity that owns this identity provider",
+          "properties": {
+            "id": {
+              "description": "unique identifier of the owner",
+              "example": "01234567-89ab-cdef-0123-456789abcdef",
+              "format": "uuid",
+              "readOnly": true,
+              "type": [
+                "string"
+              ]
+            },
+            "name": {
+              "description": "name of the owner",
+              "example": "acme",
+              "readOnly": true,
+              "type": [
+                "string"
+              ]
+            },
+            "type": {
+              "description": "type of the owner",
+              "enum": [
+                "team",
+                "enterprise-account"
+              ],
+              "example": "team",
+              "readOnly": true,
+              "type": [
+                "string"
+              ]
+            }
+          },
+          "readOnly": false,
+          "required": [
+            "id",
+            "type"
+          ],
+          "type": [
+            "object"
           ]
         }
       },
@@ -6036,6 +6156,9 @@
         },
         "updated_at": {
           "$ref": "#/definitions/identity-provider/definitions/updated_at"
+        },
+        "owner": {
+          "$ref": "#/definitions/identity-provider/definitions/owner"
         }
       }
     },
@@ -9870,6 +9993,15 @@
           "items": {
             "$ref": "#/definitions/peering/definitions/cidr"
           }
+        },
+        "space_cidr_blocks": {
+          "description": "The CIDR ranges that should be routed to the Private Space VPC.",
+          "type": [
+            "array"
+          ],
+          "items": {
+            "$ref": "#/definitions/peering/definitions/cidr"
+          }
         }
       },
       "links": [
@@ -9898,6 +10030,14 @@
         "aws_account_id": {
           "description": "The AWS account ID of your Private Space.",
           "example": "123456789012",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "aws_region": {
+          "description": "The AWS region of the peer connection.",
+          "example": "us-east-1",
           "readOnly": true,
           "type": [
             "string"
@@ -9987,6 +10127,9 @@
         },
         "aws_vpc_id": {
           "$ref": "#/definitions/peering/definitions/vpc_id"
+        },
+        "aws_region": {
+          "$ref": "#/definitions/peering/definitions/aws_region"
         },
         "aws_account_id": {
           "$ref": "#/definitions/peering/definitions/aws_account_id"
@@ -14720,6 +14863,658 @@
         }
       }
     },
+    "test-case": {
+      "$schema": "http://json-schema.org/draft-04/hyper-schema",
+      "title": "Test Case",
+      "description": "A single test case belonging to a test run",
+      "stability": "prototype",
+      "strictProperties": true,
+      "type": [
+        "object"
+      ],
+      "definitions": {
+        "id": {
+          "description": "unique identifier of a test case",
+          "readOnly": true,
+          "format": "uuid",
+          "type": [
+            "string"
+          ]
+        },
+        "description": {
+          "description": "description of the test case",
+          "type": [
+            "string"
+          ]
+        },
+        "diagnostic": {
+          "description": "meta information about the test case",
+          "type": [
+            "string"
+          ]
+        },
+        "directive": {
+          "description": "special note about the test case e.g. skipped, todo",
+          "type": [
+            "string"
+          ]
+        },
+        "passed": {
+          "description": "whether the test case was successful",
+          "type": [
+            "boolean"
+          ]
+        },
+        "number": {
+          "description": "the test number",
+          "type": [
+            "integer"
+          ]
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/test-case/definitions/id"
+            }
+          ]
+        },
+        "created_at": {
+          "description": "when test case was created",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "updated_at": {
+          "description": "when test case was updated",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        }
+      },
+      "links": [
+        {
+          "description": "List test cases",
+          "href": "/test-runs/{(%23%2Fdefinitions%2Ftest-run%2Fdefinitions%2Fid)}/test-cases",
+          "method": "GET",
+          "rel": "instances",
+          "targetSchema": {
+            "items": {
+              "$ref": "#/definitions/test-case"
+            }
+          },
+          "type": [
+            "array"
+          ],
+          "title": "List"
+        }
+      ],
+      "properties": {
+        "id": {
+          "$ref": "#/definitions/test-case/definitions/id"
+        },
+        "created_at": {
+          "$ref": "#/definitions/test-case/definitions/created_at"
+        },
+        "updated_at": {
+          "$ref": "#/definitions/test-case/definitions/updated_at"
+        },
+        "description": {
+          "$ref": "#/definitions/test-case/definitions/description"
+        },
+        "diagnostic": {
+          "$ref": "#/definitions/test-case/definitions/diagnostic"
+        },
+        "directive": {
+          "$ref": "#/definitions/test-case/definitions/directive"
+        },
+        "passed": {
+          "$ref": "#/definitions/test-case/definitions/passed"
+        },
+        "number": {
+          "$ref": "#/definitions/test-case/definitions/number"
+        },
+        "test_node": {
+          "description": "the test node which executed this test case",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/test-node/definitions/identity"
+            }
+          },
+          "type": [
+            "object"
+          ]
+        },
+        "test_run": {
+          "description": "the test run which owns this test case",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/test-run/definitions/identity"
+            }
+          },
+          "type": [
+            "object"
+          ]
+        }
+      }
+    },
+    "test-node": {
+      "$schema": "http://json-schema.org/draft-04/hyper-schema",
+      "title": "Test Node",
+      "description": "A single test node belonging to a test run",
+      "stability": "prototype",
+      "strictProperties": true,
+      "type": [
+        "object"
+      ],
+      "definitions": {
+        "id": {
+          "description": "unique identifier of a test node",
+          "example": "01234567-89ab-cdef-0123-456789abcdef",
+          "format": "uuid",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "attach_url": {
+          "description": "a URL to stream output from for debug runs or null for non-debug runs",
+          "example": "rendezvous://rendezvous.runtime.heroku.com:5000/{rendezvous-id}",
+          "readOnly": true,
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "created_at": {
+          "description": "when test node was created",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "error_status": {
+          "description": "the status of the test run when the error occured",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "exit_code": {
+          "description": "the exit code of the test script",
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/test-node/definitions/id"
+            }
+          ]
+        },
+        "index": {
+          "description": "The index of the test node",
+          "type": [
+            "integer"
+          ]
+        },
+        "message": {
+          "description": "human friendly message indicating reason for an error",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "output_stream_url": {
+          "description": "the streaming output for the test node",
+          "example": "https://example.com/output.log",
+          "type": [
+            "string"
+          ]
+        },
+        "setup_stream_url": {
+          "description": "the streaming test setup output for the test node",
+          "example": "https://example.com/test-setup.log",
+          "type": [
+            "string"
+          ]
+        },
+        "status": {
+          "description": "current state of the test run",
+          "enum": [
+            "pending",
+            "cancelled",
+            "creating",
+            "building",
+            "running",
+            "succeeded",
+            "failed",
+            "errored",
+            "debugging"
+          ],
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "updated_at": {
+          "description": "when test node was updated",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        }
+      },
+      "links": [
+        {
+          "description": "List test nodes",
+          "href": "/test-runs/{(%23%2Fdefinitions%2Ftest-run%2Fdefinitions%2Fidentity)}/test-nodes",
+          "method": "GET",
+          "rel": "instances",
+          "targetSchema": {
+            "items": {
+              "$ref": "#/definitions/test-node"
+            }
+          },
+          "type": [
+            "array"
+          ],
+          "title": "List"
+        }
+      ],
+      "properties": {
+        "created_at": {
+          "$ref": "#/definitions/test-node/definitions/created_at"
+        },
+        "dyno": {
+          "description": "the dyno which belongs to this test node",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/dyno/definitions/identity"
+            },
+            "attach_url": {
+              "$ref": "#/definitions/test-node/definitions/attach_url"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "error_status": {
+          "$ref": "#/definitions/test-node/definitions/error_status"
+        },
+        "exit_code": {
+          "$ref": "#/definitions/test-node/definitions/exit_code"
+        },
+        "id": {
+          "$ref": "#/definitions/test-node/definitions/identity"
+        },
+        "index": {
+          "$ref": "#/definitions/test-node/definitions/index"
+        },
+        "message": {
+          "$ref": "#/definitions/test-node/definitions/message"
+        },
+        "output_stream_url": {
+          "$ref": "#/definitions/test-node/definitions/output_stream_url"
+        },
+        "pipeline": {
+          "description": "the pipeline which owns this test node",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/pipeline/definitions/identity"
+            }
+          },
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "setup_stream_url": {
+          "$ref": "#/definitions/test-node/definitions/setup_stream_url"
+        },
+        "status": {
+          "$ref": "#/definitions/test-node/definitions/status"
+        },
+        "updated_at": {
+          "$ref": "#/definitions/test-node/definitions/updated_at"
+        },
+        "test_run": {
+          "description": "the test run which owns this test node",
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/test-run/definitions/identity"
+            }
+          },
+          "type": [
+            "object"
+          ]
+        }
+      }
+    },
+    "test-run": {
+      "$schema": "http://json-schema.org/draft-04/hyper-schema",
+      "title": "Test Run",
+      "description": "An execution or trial of one or more tests",
+      "stability": "prototype",
+      "strictProperties": true,
+      "type": [
+        "object"
+      ],
+      "definitions": {
+        "actor_email": {
+          "description": "the email of the actor triggering the test run",
+          "type": [
+            "string"
+          ],
+          "format": "email"
+        },
+        "clear_cache": {
+          "description": "whether the test was run with an empty cache",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "commit_branch": {
+          "description": "the branch of the repository that the test run concerns",
+          "type": [
+            "string"
+          ]
+        },
+        "commit_message": {
+          "description": "the message for the commit under test",
+          "type": [
+            "string"
+          ]
+        },
+        "commit_sha": {
+          "description": "the SHA hash of the commit under test",
+          "type": [
+            "string"
+          ]
+        },
+        "debug": {
+          "description": "whether the test run was started for interactive debugging",
+          "type": [
+            "boolean"
+          ]
+        },
+        "app_setup": {
+          "description": "the app setup for the test run",
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "id": {
+          "description": "unique identifier of a test run",
+          "readOnly": true,
+          "format": "uuid",
+          "type": [
+            "string"
+          ]
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/test-run/definitions/id"
+            }
+          ]
+        },
+        "created_at": {
+          "description": "when test run was created",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "message": {
+          "description": "human friendly message indicating reason for an error",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "number": {
+          "description": "the auto incrementing test run number",
+          "type": [
+            "integer"
+          ]
+        },
+        "source_blob_url": {
+          "description": "The download location for the source code to be tested",
+          "type": [
+            "string"
+          ]
+        },
+        "status": {
+          "description": "current state of the test run",
+          "enum": [
+            "pending",
+            "cancelled",
+            "creating",
+            "building",
+            "running",
+            "succeeded",
+            "failed",
+            "errored",
+            "debugging"
+          ],
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "updated_at": {
+          "description": "when test-run was updated",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "warning_message": {
+          "description": "human friently warning emitted during the test run",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "links": [
+        {
+          "description": "Create a new test-run.",
+          "href": "/test-runs",
+          "method": "POST",
+          "rel": "create",
+          "schema": {
+            "properties": {
+              "commit_branch": {
+                "$ref": "#/definitions/test-run/definitions/commit_branch"
+              },
+              "commit_message": {
+                "$ref": "#/definitions/test-run/definitions/commit_message"
+              },
+              "commit_sha": {
+                "$ref": "#/definitions/test-run/definitions/commit_sha"
+              },
+              "debug": {
+                "$ref": "#/definitions/test-run/definitions/debug"
+              },
+              "organization": {
+                "$ref": "#/definitions/organization/definitions/identity"
+              },
+              "pipeline": {
+                "$ref": "#/definitions/pipeline/definitions/identity"
+              },
+              "source_blob_url": {
+                "$ref": "#/definitions/test-run/definitions/source_blob_url"
+              }
+            },
+            "required": [
+              "commit_branch",
+              "commit_message",
+              "commit_sha",
+              "pipeline",
+              "source_blob_url"
+            ],
+            "type": [
+              "object"
+            ]
+          },
+          "title": "Create"
+        },
+        {
+          "description": "Info for existing test-run.",
+          "href": "/test-runs/{(%23%2Fdefinitions%2Ftest-run%2Fdefinitions%2Fid)}",
+          "method": "GET",
+          "rel": "self",
+          "title": "InfoById"
+        },
+        {
+          "description": "List existing test-runs for a pipeline.",
+          "href": "/pipelines/{(%23%2Fdefinitions%2Fpipeline%2Fdefinitions%2Fid)}/test-runs",
+          "method": "GET",
+          "rel": "instances",
+          "targetSchema": {
+            "items": {
+              "$ref": "#/definitions/test-run"
+            }
+          },
+          "type": [
+            "array"
+          ],
+          "title": "List"
+        },
+        {
+          "description": "Info for existing test-run.",
+          "href": "/pipelines/{(%23%2Fdefinitions%2Fpipeline%2Fdefinitions%2Fid)}/test-runs/{(%23%2Fdefinitions%2Ftest-run%2Fdefinitions%2Fnumber)}",
+          "method": "GET",
+          "rel": "self",
+          "title": "InfoByNumber"
+        },
+        {
+          "description": "Update a test-run's status.",
+          "href": "/test-runs/{(%23%2Fdefinitions%2Ftest-run%2Fdefinitions%2Fnumber)}",
+          "method": "PATCH",
+          "rel": "self",
+          "title": "Update",
+          "schema": {
+            "properties": {
+              "status": {
+                "$ref": "#/definitions/test-run/definitions/status"
+              },
+              "message": {
+                "$ref": "#/definitions/test-run/definitions/message"
+              }
+            },
+            "required": [
+              "status",
+              "message"
+            ],
+            "type": [
+              "object"
+            ]
+          }
+        }
+      ],
+      "properties": {
+        "actor_email": {
+          "$ref": "#/definitions/test-run/definitions/actor_email"
+        },
+        "clear_cache": {
+          "$ref": "#/definitions/test-run/definitions/clear_cache"
+        },
+        "commit_branch": {
+          "$ref": "#/definitions/test-run/definitions/commit_branch"
+        },
+        "commit_message": {
+          "$ref": "#/definitions/test-run/definitions/commit_message"
+        },
+        "commit_sha": {
+          "$ref": "#/definitions/test-run/definitions/commit_sha"
+        },
+        "debug": {
+          "$ref": "#/definitions/test-run/definitions/debug"
+        },
+        "app_setup": {
+          "$ref": "#/definitions/test-run/definitions/app_setup"
+        },
+        "created_at": {
+          "$ref": "#/definitions/test-run/definitions/created_at"
+        },
+        "dyno": {
+          "description": "the type of dynos used for this test-run",
+          "properties": {
+            "size": {
+              "$ref": "#/definitions/dyno/definitions/size"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "id": {
+          "$ref": "#/definitions/test-run/definitions/id"
+        },
+        "message": {
+          "$ref": "#/definitions/test-run/definitions/message"
+        },
+        "number": {
+          "$ref": "#/definitions/test-run/definitions/number"
+        },
+        "organization": {
+          "description": "the organization that owns this test-run",
+          "properties": {
+            "name": {
+              "$ref": "#/definitions/organization/definitions/name"
+            }
+          },
+          "type": [
+            "null",
+            "object"
+          ]
+        },
+        "pipeline": {
+          "description": "the pipeline which owns this test-run",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "id": {
+              "$ref": "#/definitions/pipeline/definitions/identity"
+            }
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/test-run/definitions/status"
+        },
+        "source_blob_url": {
+          "$ref": "#/definitions/test-run/definitions/source_blob_url"
+        },
+        "updated_at": {
+          "$ref": "#/definitions/test-run/definitions/updated_at"
+        },
+        "user": {
+          "$ref": "#/definitions/account"
+        },
+        "warning_message": {
+          "$ref": "#/definitions/test-run/definitions/warning_message"
+        }
+      }
+    },
     "user-preferences": {
       "description": "Tracks a user's preferences and message dismissals",
       "$schema": "http://json-schema.org/draft-04/hyper-schema",
@@ -14939,7 +15734,7 @@
     "vpn-connection": {
       "description": "[VPN](https://devcenter.heroku.com/articles/private-spaces-vpn?preview=1) provides a way to connect your Private Spaces to your network via VPN.",
       "$schema": "http://json-schema.org/draft-04/hyper-schema",
-      "stability": "prototype",
+      "stability": "development",
       "strictProperties": true,
       "title": "Heroku Platform API - Private Spaces VPN",
       "type": [
@@ -15068,7 +15863,6 @@
             "provisioning",
             "active",
             "deprovisioning",
-            "complete",
             "failed"
           ],
           "example": "active",
@@ -15390,6 +16184,279 @@
           "$ref": "#/definitions/whitelisted-add-on-service/definitions/id"
         }
       }
+    },
+    "docker-image": {
+      "description": "A Docker image is a snapshot of your application code that is ready to run on the platform.",
+      "$schema": "http://json-schema.org/draft-04/hyper-schema",
+      "stability": "prototype",
+      "strictProperties": true,
+      "title": "Heroku Platform API - Docker Image",
+      "type": [
+        "object"
+      ],
+      "definitions": {
+        "command": {
+          "description": "the command to run",
+          "example": [
+            "echo",
+            "Hello, World"
+          ],
+          "readOnly": false,
+          "type": [
+            "array"
+          ],
+          "minItems": 1
+        },
+        "created_at": {
+          "description": "when the image was created",
+          "example": "2012-01-01T12:00:00Z",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "entrypoint": {
+          "description": "the entrypoint to the command",
+          "example": [
+            "/bin/sh",
+            "-c"
+          ],
+          "readOnly": false,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "env": {
+          "description": "the runtime environment required for the command",
+          "example": {
+            "PATH": "/bin"
+          },
+          "readOnly": false,
+          "additionalProperties": false,
+          "patternProperties": {
+            "^\\w+$": {
+              "type": [
+                "string"
+              ]
+            }
+          },
+          "type": [
+            "object"
+          ]
+        },
+        "id": {
+          "description": "unique identifier of the image",
+          "example": "01234567-89ab-cdef-0123-456789abcdef",
+          "format": "uuid",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "identity": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/docker-image/definitions/id"
+            }
+          ]
+        },
+        "image_id": {
+          "description": "the Docker image ID",
+          "example": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "layers": {
+          "description": "the layers of the image",
+          "properties": {
+            "system": {
+              "description": "the system layers of the image",
+              "example": [
+                {
+                  "url": "https://example.cloudfront.com/..."
+                }
+              ],
+              "readOnly": false,
+              "items": {
+                "$ref": "#/definitions/docker-image/definitions/system_layer"
+              },
+              "type": [
+                "array"
+              ]
+            },
+            "user": {
+              "description": "the user layers of the image",
+              "example": [
+                {
+                  "bucket": "example",
+                  "object": "/..."
+                }
+              ],
+              "readOnly": false,
+              "items": {
+                "$ref": "#/definitions/docker-image/definitions/user_layer"
+              },
+              "type": [
+                "array"
+              ]
+            }
+          },
+          "readOnly": false,
+          "type": [
+            "object"
+          ]
+        },
+        "shell": {
+          "description": "the default shell",
+          "example": [
+            "/bin/sh",
+            "-c"
+          ],
+          "readOnly": false,
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "system_layer": {
+          "description": "a system layer",
+          "properties": {
+            "url": {
+              "description": "the location of the system layer",
+              "example": "https://example.cloudfront.com/...",
+              "readOnly": false,
+              "type": [
+                "string"
+              ]
+            }
+          },
+          "readOnly": false,
+          "type": [
+            "object"
+          ]
+        },
+        "updated_at": {
+          "description": "when the image was updated",
+          "example": "2012-01-01T12:00:00Z",
+          "format": "date-time",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        },
+        "user_layer": {
+          "description": "a user layer",
+          "properties": {
+            "bucket": {
+              "description": "the S3 bucket name where the user layer is stored",
+              "example": "example",
+              "readOnly": false,
+              "type": [
+                "string"
+              ]
+            },
+            "object": {
+              "description": "the S3 object name where the user layer is stored",
+              "example": "/...",
+              "readOnly": false,
+              "type": [
+                "string"
+              ]
+            }
+          },
+          "readOnly": false,
+          "type": [
+            "object"
+          ]
+        },
+        "working_directory": {
+          "description": "the working directory for the command",
+          "example": "/home/user",
+          "readOnly": true,
+          "type": [
+            "string"
+          ]
+        }
+      },
+      "links": [
+        {
+          "description": "Create a new Docker image.",
+          "href": "/apps/{(%23%2Fdefinitions%2Fapp%2Fdefinitions%2Fidentity)}/docker-images",
+          "method": "POST",
+          "rel": "create",
+          "schema": {
+            "properties": {
+              "command": {
+                "$ref": "#/definitions/docker-image/definitions/command"
+              },
+              "entrypoint": {
+                "$ref": "#/definitions/docker-image/definitions/entrypoint"
+              },
+              "env": {
+                "$ref": "#/definitions/docker-image/definitions/env"
+              },
+              "image_id": {
+                "$ref": "#/definitions/docker-image/definitions/image_id"
+              },
+              "layers": {
+                "$ref": "#/definitions/docker-image/definitions/layers"
+              },
+              "shell": {
+                "$ref": "#/definitions/docker-image/definitions/shell"
+              },
+              "working_directory": {
+                "$ref": "#/definitions/docker-image/definitions/working_directory"
+              }
+            },
+            "required": [
+              "layers"
+            ],
+            "type": [
+              "object"
+            ]
+          },
+          "targetSchema": {
+            "$ref": "#/definitions/docker-image"
+          },
+          "title": "Create"
+        }
+      ],
+      "properties": {
+        "command": {
+          "$ref": "#/definitions/docker-image/definitions/command"
+        },
+        "created_at": {
+          "$ref": "#/definitions/docker-image/definitions/created_at"
+        },
+        "entrypoint": {
+          "$ref": "#/definitions/docker-image/definitions/entrypoint"
+        },
+        "env": {
+          "$ref": "#/definitions/docker-image/definitions/env"
+        },
+        "id": {
+          "$ref": "#/definitions/docker-image/definitions/id"
+        },
+        "image_id": {
+          "$ref": "#/definitions/docker-image/definitions/image_id"
+        },
+        "layers": {
+          "$ref": "#/definitions/docker-image/definitions/layers"
+        },
+        "shell": {
+          "$ref": "#/definitions/docker-image/definitions/shell"
+        },
+        "updated_at": {
+          "$ref": "#/definitions/docker-image/definitions/updated_at"
+        },
+        "working_directory": {
+          "$ref": "#/definitions/docker-image/definitions/working_directory"
+        }
+      }
     }
   },
   "properties": {
@@ -15639,6 +16706,15 @@
     "team": {
       "$ref": "#/definitions/team"
     },
+    "test-case": {
+      "$ref": "#/definitions/test-case"
+    },
+    "test-node": {
+      "$ref": "#/definitions/test-node"
+    },
+    "test-run": {
+      "$ref": "#/definitions/test-run"
+    },
     "user-preferences": {
       "$ref": "#/definitions/user-preferences"
     },
@@ -15647,6 +16723,9 @@
     },
     "whitelisted-add-on-service": {
       "$ref": "#/definitions/whitelisted-add-on-service"
+    },
+    "docker-image": {
+      "$ref": "#/definitions/docker-image"
     }
   },
   "description": "The platform API empowers developers to automate, extend and combine Heroku with other services.",

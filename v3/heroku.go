@@ -15,17 +15,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/go-querystring/query"
 	"io"
 	"net/http"
 	"reflect"
 	"runtime"
 	"strings"
 	"time"
+
+	"github.com/google/go-querystring/query"
 )
 
 const (
-	Version          = "v3"
+	Version          = "v3.docker-releases"
 	DefaultUserAgent = "heroku/" + Version + " (" + runtime.GOOS + "; " + runtime.GOARCH + ")"
 	DefaultURL       = "https://api.heroku.com"
 )
@@ -226,6 +227,11 @@ type Account struct {
 		Organization struct {
 			Name string `json:"name" url:"name,key"` // unique name of organization
 		} `json:"organization" url:"organization,key"`
+		Owner struct {
+			ID   string `json:"id" url:"id,key"`     // unique identifier of the owner
+			Name string `json:"name" url:"name,key"` // name of the owner
+			Type string `json:"type" url:"type,key"` // type of the owner
+		} `json:"owner" url:"owner,key"` // entity that owns this identity provider
 	} `json:"identity_provider" url:"identity_provider,key"` // Identity Provider details for federated users.
 	LastLogin               *time.Time `json:"last_login" url:"last_login,key"`                               // when account last authorized with Heroku
 	Name                    *string    `json:"name" url:"name,key"`                                           // full name of the account owner
@@ -1736,6 +1742,52 @@ func (s *Service) CreditList(ctx context.Context, lr *ListRange) (CreditListResu
 	return credit, s.Get(ctx, &credit, fmt.Sprintf("/account/credits"), nil, lr)
 }
 
+// A Docker image is a snapshot of your application code that is ready
+// to run on the platform.
+type DockerImage struct {
+	Command    []interface{}     `json:"command" url:"command,key"`       // the command to run
+	CreatedAt  time.Time         `json:"created_at" url:"created_at,key"` // when the image was created
+	Entrypoint []interface{}     `json:"entrypoint" url:"entrypoint,key"` // the entrypoint to the command
+	Env        map[string]string `json:"env" url:"env,key"`               // the runtime environment required for the command
+	ID         string            `json:"id" url:"id,key"`                 // unique identifier of the image
+	ImageID    string            `json:"image_id" url:"image_id,key"`     // the Docker image ID
+	Layers     struct {
+		System []struct {
+			URL string `json:"url" url:"url,key"` // the location of the system layer
+		} `json:"system" url:"system,key"` // the system layers of the image
+		User []struct {
+			Bucket string `json:"bucket" url:"bucket,key"` // the S3 bucket name where the user layer is stored
+			Object string `json:"object" url:"object,key"` // the S3 object name where the user layer is stored
+		} `json:"user" url:"user,key"` // the user layers of the image
+	} `json:"layers" url:"layers,key"` // the layers of the image
+	Shell            []interface{} `json:"shell" url:"shell,key"`                         // the default shell
+	UpdatedAt        time.Time     `json:"updated_at" url:"updated_at,key"`               // when the image was updated
+	WorkingDirectory string        `json:"working_directory" url:"working_directory,key"` // the working directory for the command
+}
+type DockerImageCreateOpts struct {
+	Command    []interface{}     `json:"command,omitempty" url:"command,omitempty,key"`       // the command to run
+	Entrypoint []interface{}     `json:"entrypoint,omitempty" url:"entrypoint,omitempty,key"` // the entrypoint to the command
+	Env        map[string]string `json:"env,omitempty" url:"env,omitempty,key"`               // the runtime environment required for the command
+	ImageID    *string           `json:"image_id,omitempty" url:"image_id,omitempty,key"`     // the Docker image ID
+	Layers     struct {
+		System []*struct {
+			URL *string `json:"url,omitempty" url:"url,omitempty,key"` // the location of the system layer
+		} `json:"system,omitempty" url:"system,omitempty,key"` // the system layers of the image
+		User []*struct {
+			Bucket *string `json:"bucket,omitempty" url:"bucket,omitempty,key"` // the S3 bucket name where the user layer is stored
+			Object *string `json:"object,omitempty" url:"object,omitempty,key"` // the S3 object name where the user layer is stored
+		} `json:"user,omitempty" url:"user,omitempty,key"` // the user layers of the image
+	} `json:"layers" url:"layers,key"` // the layers of the image
+	Shell            []interface{} `json:"shell,omitempty" url:"shell,omitempty,key"`                         // the default shell
+	WorkingDirectory *string       `json:"working_directory,omitempty" url:"working_directory,omitempty,key"` // the working directory for the command
+}
+
+// Create a new Docker image.
+func (s *Service) DockerImageCreate(ctx context.Context, appIdentity string, o DockerImageCreateOpts) (*DockerImage, error) {
+	var dockerImage DockerImage
+	return &dockerImage, s.Post(ctx, &dockerImage, fmt.Sprintf("/apps/%v/docker-images", appIdentity), o)
+}
+
 // Domains define what web routes should be routed to an app on Heroku.
 type Domain struct {
 	AcmStatus       *string `json:"acm_status" url:"acm_status,key"`               // status of this record's ACM
@@ -1960,8 +2012,11 @@ type Formation struct {
 		ID   string `json:"id" url:"id,key"`     // unique identifier of app
 		Name string `json:"name" url:"name,key"` // unique name of app
 	} `json:"app" url:"app,key"` // app formation belongs to
-	Command   string    `json:"command" url:"command,key"`       // command to use to launch this process
-	CreatedAt time.Time `json:"created_at" url:"created_at,key"` // when process type was created
+	Command     string    `json:"command" url:"command,key"`       // command to use to launch this process
+	CreatedAt   time.Time `json:"created_at" url:"created_at,key"` // when process type was created
+	DockerImage *struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of the image
+	} `json:"docker_image" url:"docker_image,key"` // the Docker image used by this process type
 	ID        string    `json:"id" url:"id,key"`                 // unique identifier of this process type
 	Quantity  int       `json:"quantity" url:"quantity,key"`     // number of processes to maintain
 	Size      string    `json:"size" url:"size,key"`             // dyno size (default: "standard-1X")
@@ -1985,9 +2040,11 @@ func (s *Service) FormationList(ctx context.Context, appIdentity string, lr *Lis
 
 type FormationBatchUpdateOpts struct {
 	Updates []struct {
-		Quantity *int    `json:"quantity,omitempty" url:"quantity,omitempty,key"` // number of processes to maintain
-		Size     *string `json:"size,omitempty" url:"size,omitempty,key"`         // dyno size (default: "standard-1X")
-		Type     string  `json:"type" url:"type,key"`                             // type of process to maintain
+		Command     *string `json:"command,omitempty" url:"command,omitempty,key"`           // command to use to launch this process
+		DockerImage *string `json:"docker_image,omitempty" url:"docker_image,omitempty,key"` // unique identifier of the image
+		Process     string  `json:"process" url:"process,key"`                               // unique identifier of this process type
+		Quantity    *int    `json:"quantity,omitempty" url:"quantity,omitempty,key"`         // number of processes to maintain
+		Size        *string `json:"size,omitempty" url:"size,omitempty,key"`                 // dyno size (default: "standard-1X")
 	} `json:"updates" url:"updates,key"` // Array with formation updates. Each element must have "type", the id
 	// or name of the process type to be updated, and can optionally update
 	// its "quantity" or "size".
@@ -2001,8 +2058,10 @@ func (s *Service) FormationBatchUpdate(ctx context.Context, appIdentity string, 
 }
 
 type FormationUpdateOpts struct {
-	Quantity *int    `json:"quantity,omitempty" url:"quantity,omitempty,key"` // number of processes to maintain
-	Size     *string `json:"size,omitempty" url:"size,omitempty,key"`         // dyno size (default: "standard-1X")
+	Command     *string `json:"command,omitempty" url:"command,omitempty,key"`           // command to use to launch this process
+	DockerImage *string `json:"docker_image,omitempty" url:"docker_image,omitempty,key"` // unique identifier of the image
+	Quantity    *int    `json:"quantity,omitempty" url:"quantity,omitempty,key"`         // number of processes to maintain
+	Size        *string `json:"size,omitempty" url:"size,omitempty,key"`                 // dyno size (default: "standard-1X")
 }
 
 // Update process type
@@ -2021,6 +2080,11 @@ type IdentityProvider struct {
 	Organization *struct {
 		Name string `json:"name" url:"name,key"` // unique name of organization
 	} `json:"organization" url:"organization,key"` // organization associated with this identity provider
+	Owner struct {
+		ID   string `json:"id" url:"id,key"`     // unique identifier of the owner
+		Name string `json:"name" url:"name,key"` // name of the owner
+		Type string `json:"type" url:"type,key"` // type of the owner
+	} `json:"owner" url:"owner,key"` // entity that owns this identity provider
 	SloTargetURL string    `json:"slo_target_url" url:"slo_target_url,key"` // single log out URL for this identity provider
 	SsoTargetURL string    `json:"sso_target_url" url:"sso_target_url,key"` // single sign on URL for this identity provider
 	UpdatedAt    time.Time `json:"updated_at" url:"updated_at,key"`         // when the identity provider record was updated
@@ -3204,6 +3268,7 @@ func (s *Service) PasswordResetCompleteResetPassword(ctx context.Context, passwo
 // VPC.
 type Peering struct {
 	AwsAccountID string    `json:"aws_account_id" url:"aws_account_id,key"` // The AWS account ID of your Private Space.
+	AwsRegion    string    `json:"aws_region" url:"aws_region,key"`         // The AWS region of the peer connection.
 	AwsVpcID     string    `json:"aws_vpc_id" url:"aws_vpc_id,key"`         // The AWS VPC ID of the peer.
 	CIDRBlocks   []string  `json:"cidr_blocks" url:"cidr_blocks,key"`       // The CIDR blocks of the peer.
 	Expires      time.Time `json:"expires" url:"expires,key"`               // When a peering connection will expire.
@@ -3245,6 +3310,7 @@ type PeeringInfo struct {
 	AwsAccountID          string   `json:"aws_account_id" url:"aws_account_id,key"`                   // The AWS account ID of your Private Space.
 	AwsRegion             string   `json:"aws_region" url:"aws_region,key"`                           // region name used by provider
 	DynoCIDRBlocks        []string `json:"dyno_cidr_blocks" url:"dyno_cidr_blocks,key"`               // The CIDR ranges that should be routed to the Private Space VPC.
+	SpaceCIDRBlocks       []string `json:"space_cidr_blocks" url:"space_cidr_blocks,key"`             // The CIDR ranges that should be routed to the Private Space VPC.
 	UnavailableCIDRBlocks []string `json:"unavailable_cidr_blocks" url:"unavailable_cidr_blocks,key"` // The CIDR ranges that you must not conflict with.
 	VpcCIDR               string   `json:"vpc_cidr" url:"vpc_cidr,key"`                               // An IP address and the number of significant bits that make up the
 	// routing or networking portion.
@@ -4481,6 +4547,165 @@ type TeamPreferencesUpdateOpts struct {
 func (s *Service) TeamPreferencesUpdate(ctx context.Context, teamPreferencesIdentity string, o TeamPreferencesUpdateOpts) (*TeamPreferences, error) {
 	var teamPreferences TeamPreferences
 	return &teamPreferences, s.Patch(ctx, &teamPreferences, fmt.Sprintf("/teams/%v/preferences", teamPreferencesIdentity), o)
+}
+
+// A single test case belonging to a test run
+type TestCase struct {
+	CreatedAt   time.Time `json:"created_at" url:"created_at,key"`   // when test case was created
+	Description string    `json:"description" url:"description,key"` // description of the test case
+	Diagnostic  string    `json:"diagnostic" url:"diagnostic,key"`   // meta information about the test case
+	Directive   string    `json:"directive" url:"directive,key"`     // special note about the test case e.g. skipped, todo
+	ID          string    `json:"id" url:"id,key"`                   // unique identifier of a test case
+	Number      int       `json:"number" url:"number,key"`           // the test number
+	Passed      bool      `json:"passed" url:"passed,key"`           // whether the test case was successful
+	TestNode    struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of a test node
+	} `json:"test_node" url:"test_node,key"` // the test node which executed this test case
+	TestRun struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of a test run
+	} `json:"test_run" url:"test_run,key"` // the test run which owns this test case
+	UpdatedAt time.Time `json:"updated_at" url:"updated_at,key"` // when test case was updated
+}
+type TestCaseListResult []TestCase
+
+// List test cases
+func (s *Service) TestCaseList(ctx context.Context, testRunID string, lr *ListRange) error {
+	return s.Get(ctx, nil, fmt.Sprintf("/test-runs/%v/test-cases", testRunID), nil, lr)
+}
+
+// A single test node belonging to a test run
+type TestNode struct {
+	CreatedAt time.Time `json:"created_at" url:"created_at,key"` // when test node was created
+	Dyno      *struct {
+		AttachURL *string `json:"attach_url" url:"attach_url,key"` // a URL to stream output from for debug runs or null for non-debug runs
+		ID        string  `json:"id" url:"id,key"`                 // unique identifier of this dyno
+	} `json:"dyno" url:"dyno,key"` // the dyno which belongs to this test node
+	ErrorStatus     *string `json:"error_status" url:"error_status,key"`           // the status of the test run when the error occured
+	ExitCode        *int    `json:"exit_code" url:"exit_code,key"`                 // the exit code of the test script
+	ID              string  `json:"id" url:"id,key"`                               // unique identifier of a test node
+	Index           int     `json:"index" url:"index,key"`                         // The index of the test node
+	Message         *string `json:"message" url:"message,key"`                     // human friendly message indicating reason for an error
+	OutputStreamURL string  `json:"output_stream_url" url:"output_stream_url,key"` // the streaming output for the test node
+	Pipeline        *struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of pipeline
+	} `json:"pipeline" url:"pipeline,key"` // the pipeline which owns this test node
+	SetupStreamURL string `json:"setup_stream_url" url:"setup_stream_url,key"` // the streaming test setup output for the test node
+	Status         string `json:"status" url:"status,key"`                     // current state of the test run
+	TestRun        struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of a test run
+	} `json:"test_run" url:"test_run,key"` // the test run which owns this test node
+	UpdatedAt time.Time `json:"updated_at" url:"updated_at,key"` // when test node was updated
+}
+type TestNodeListResult []TestNode
+
+// List test nodes
+func (s *Service) TestNodeList(ctx context.Context, testRunIdentity string, lr *ListRange) error {
+	return s.Get(ctx, nil, fmt.Sprintf("/test-runs/%v/test-nodes", testRunIdentity), nil, lr)
+}
+
+// An execution or trial of one or more tests
+type TestRun struct {
+	ActorEmail    string    `json:"actor_email" url:"actor_email,key"`       // the email of the actor triggering the test run
+	AppSetup      *struct{} `json:"app_setup" url:"app_setup,key"`           // the app setup for the test run
+	ClearCache    *bool     `json:"clear_cache" url:"clear_cache,key"`       // whether the test was run with an empty cache
+	CommitBranch  string    `json:"commit_branch" url:"commit_branch,key"`   // the branch of the repository that the test run concerns
+	CommitMessage string    `json:"commit_message" url:"commit_message,key"` // the message for the commit under test
+	CommitSha     string    `json:"commit_sha" url:"commit_sha,key"`         // the SHA hash of the commit under test
+	CreatedAt     time.Time `json:"created_at" url:"created_at,key"`         // when test run was created
+	Debug         bool      `json:"debug" url:"debug,key"`                   // whether the test run was started for interactive debugging
+	Dyno          *struct {
+		Size string `json:"size" url:"size,key"` // dyno size (default: "standard-1X")
+	} `json:"dyno" url:"dyno,key"` // the type of dynos used for this test-run
+	ID           string  `json:"id" url:"id,key"`           // unique identifier of a test run
+	Message      *string `json:"message" url:"message,key"` // human friendly message indicating reason for an error
+	Number       int     `json:"number" url:"number,key"`   // the auto incrementing test run number
+	Organization *struct {
+		Name string `json:"name" url:"name,key"` // unique name of organization
+	} `json:"organization" url:"organization,key"` // the organization that owns this test-run
+	Pipeline *struct {
+		ID string `json:"id" url:"id,key"` // unique identifier of pipeline
+	} `json:"pipeline" url:"pipeline,key"` // the pipeline which owns this test-run
+	SourceBlobURL string    `json:"source_blob_url" url:"source_blob_url,key"` // The download location for the source code to be tested
+	Status        string    `json:"status" url:"status,key"`                   // current state of the test run
+	UpdatedAt     time.Time `json:"updated_at" url:"updated_at,key"`           // when test-run was updated
+	User          struct {
+		AllowTracking       bool      `json:"allow_tracking" url:"allow_tracking,key"` // whether to allow third party web activity tracking
+		Beta                bool      `json:"beta" url:"beta,key"`                     // whether allowed to utilize beta Heroku features
+		CreatedAt           time.Time `json:"created_at" url:"created_at,key"`         // when account was created
+		DefaultOrganization *struct {
+			ID   string `json:"id" url:"id,key"`     // unique identifier of organization
+			Name string `json:"name" url:"name,key"` // unique name of organization
+		} `json:"default_organization" url:"default_organization,key"` // organization selected by default
+		DelinquentAt     *time.Time `json:"delinquent_at" url:"delinquent_at,key"` // when account became delinquent
+		Email            string     `json:"email" url:"email,key"`                 // unique email address of account
+		Federated        bool       `json:"federated" url:"federated,key"`         // whether the user is federated and belongs to an Identity Provider
+		ID               string     `json:"id" url:"id,key"`                       // unique identifier of an account
+		IdentityProvider *struct {
+			ID           string `json:"id" url:"id,key"` // unique identifier of this identity provider
+			Organization struct {
+				Name string `json:"name" url:"name,key"` // unique name of organization
+			} `json:"organization" url:"organization,key"`
+			Owner struct {
+				ID   string `json:"id" url:"id,key"`     // unique identifier of the owner
+				Name string `json:"name" url:"name,key"` // name of the owner
+				Type string `json:"type" url:"type,key"` // type of the owner
+			} `json:"owner" url:"owner,key"` // entity that owns this identity provider
+		} `json:"identity_provider" url:"identity_provider,key"` // Identity Provider details for federated users.
+		LastLogin               *time.Time `json:"last_login" url:"last_login,key"`                               // when account last authorized with Heroku
+		Name                    *string    `json:"name" url:"name,key"`                                           // full name of the account owner
+		SmsNumber               *string    `json:"sms_number" url:"sms_number,key"`                               // SMS number of account
+		SuspendedAt             *time.Time `json:"suspended_at" url:"suspended_at,key"`                           // when account was suspended
+		TwoFactorAuthentication bool       `json:"two_factor_authentication" url:"two_factor_authentication,key"` // whether two-factor auth is enabled on the account
+		UpdatedAt               time.Time  `json:"updated_at" url:"updated_at,key"`                               // when account was updated
+		Verified                bool       `json:"verified" url:"verified,key"`                                   // whether account has been verified with billing information
+	} `json:"user" url:"user,key"` // An account represents an individual signed up to use the Heroku
+	// platform.
+	WarningMessage *string `json:"warning_message" url:"warning_message,key"` // human friently warning emitted during the test run
+}
+type TestRunCreateOpts struct {
+	CommitBranch  string  `json:"commit_branch" url:"commit_branch,key"`                   // the branch of the repository that the test run concerns
+	CommitMessage string  `json:"commit_message" url:"commit_message,key"`                 // the message for the commit under test
+	CommitSha     string  `json:"commit_sha" url:"commit_sha,key"`                         // the SHA hash of the commit under test
+	Debug         *bool   `json:"debug,omitempty" url:"debug,omitempty,key"`               // whether the test run was started for interactive debugging
+	Organization  *string `json:"organization,omitempty" url:"organization,omitempty,key"` // unique name of organization
+	Pipeline      string  `json:"pipeline" url:"pipeline,key"`                             // unique identifier of pipeline
+	SourceBlobURL string  `json:"source_blob_url" url:"source_blob_url,key"`               // The download location for the source code to be tested
+}
+
+// Create a new test-run.
+func (s *Service) TestRunCreate(ctx context.Context, o TestRunCreateOpts) (*TestRun, error) {
+	var testRun TestRun
+	return &testRun, s.Post(ctx, &testRun, fmt.Sprintf("/test-runs"), o)
+}
+
+// Info for existing test-run.
+func (s *Service) TestRunInfoByID(ctx context.Context, testRunID string) (*TestRun, error) {
+	var testRun TestRun
+	return &testRun, s.Get(ctx, &testRun, fmt.Sprintf("/test-runs/%v", testRunID), nil, nil)
+}
+
+type TestRunListResult []TestRun
+
+// List existing test-runs for a pipeline.
+func (s *Service) TestRunList(ctx context.Context, pipelineID string, lr *ListRange) error {
+	return s.Get(ctx, nil, fmt.Sprintf("/pipelines/%v/test-runs", pipelineID), nil, lr)
+}
+
+// Info for existing test-run.
+func (s *Service) TestRunInfoByNumber(ctx context.Context, pipelineID string, testRunNumber int) (*TestRun, error) {
+	var testRun TestRun
+	return &testRun, s.Get(ctx, &testRun, fmt.Sprintf("/pipelines/%v/test-runs/%v", pipelineID, testRunNumber), nil, nil)
+}
+
+type TestRunUpdateOpts struct {
+	Message *string `json:"message" url:"message,key"` // human friendly message indicating reason for an error
+	Status  string  `json:"status" url:"status,key"`   // current state of the test run
+}
+
+// Update a test-run's status.
+func (s *Service) TestRunUpdate(ctx context.Context, testRunNumber int, o TestRunUpdateOpts) (*TestRun, error) {
+	var testRun TestRun
+	return &testRun, s.Patch(ctx, &testRun, fmt.Sprintf("/test-runs/%v", testRunNumber), o)
 }
 
 // Tracks a user's preferences and message dismissals
